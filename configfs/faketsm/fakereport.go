@@ -239,6 +239,12 @@ func (r *ReportSubsystem) RemoveAll(name string) error {
 	return nil
 }
 
+func renderOutBlob(privlevel string, inblob []byte) []byte {
+	return []byte(fmt.Sprintf("privlevel: %s\ninblob: %s",
+		privlevel,
+		hex.EncodeToString(inblob)))
+}
+
 func readV7(privlevelFloor uint) func(*ReportEntry, string) ([]byte, error) {
 	return func(e *ReportEntry, attr string) ([]byte, error) {
 		switch attr {
@@ -255,10 +261,7 @@ func readV7(privlevelFloor uint) func(*ReportEntry, string) ([]byte, error) {
 			if !ok || len(inblob.Value) == 0 {
 				return nil, syscall.EINVAL
 			}
-			return []byte(fmt.Sprintf("privlevel: %s\ninblob: %s",
-				privlevel,
-				hex.EncodeToString(inblob.Value))), nil
-			return nil, fmt.Errorf("unimplemented")
+			return renderOutBlob(privlevel, inblob.Value), nil
 		case "privlevel_floor":
 			return []byte(strconv.FormatUint(uint64(privlevelFloor), 10)), nil
 		}

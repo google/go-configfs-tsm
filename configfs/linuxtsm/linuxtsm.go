@@ -15,29 +15,49 @@
 // Package linuxtsm defines a configfsi.Client for Linux OS operations on configfs.
 package linuxtsm
 
-import "os"
+import (
+	"fmt"
+	"os"
+	"path"
 
-// Client provides configfsi.Client for /sys/kernel/config/tsm file operations in Linux.
-type Client struct{}
+	"github.com/google/go-configfs-tsm/configfs/configfsi"
+)
+
+// client provides configfsi.Client for /sys/kernel/config/tsm file operations in Linux.
+type client struct{}
 
 // MkdirTemp creates a new temporary directory in the directory dir and returns the pathname
 // of the new directory. Pattern semantics follow os.MkdirTemp.
-func (*Client) MkdirTemp(dir, pattern string) (string, error) {
+func (*client) MkdirTemp(dir, pattern string) (string, error) {
 	return os.MkdirTemp(dir, pattern)
 }
 
 // ReadFile reads the named file and returns the contents.
-func (*Client) ReadFile(name string) ([]byte, error) {
+func (*client) ReadFile(name string) ([]byte, error) {
 	return os.ReadFile(name)
 }
 
 // WriteFile writes data to the named file, creating it if necessary. The permissions
 // are implementation-defined.
-func (*Client) WriteFile(name string, contents []byte) error {
+func (*client) WriteFile(name string, contents []byte) error {
 	return os.WriteFile(name, contents, 0220)
 }
 
 // RemoveAll removes path and any children it contains.
-func (*Client) RemoveAll(path string) error {
+func (*client) RemoveAll(path string) error {
 	return os.Remove(path)
+}
+
+// MakeClient returns a "real" client for using configfs for TSM use.
+func MakeClient() (configfsi.Client, error) {
+	// Linux client expects just the "report" subsystem for now.
+	checkPath := path.Join(configfsi.TsmPrefix, "report")
+	info, err := os.Stat(checkPath)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("expected %s to be a directory", checkPath)
+	}
+	return &client{}, nil
 }

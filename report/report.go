@@ -17,11 +17,11 @@
 package report
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/google/go-configfs-tsm/configfs/configfsi"
-	"github.com/google/uuid"
 	"go.uber.org/multierr"
 )
 
@@ -61,6 +61,29 @@ type Response struct {
 	AuxBlob  []byte
 }
 
+// GenerationErr is returned when an attribute's value is invalid due to mismatched expectations
+// on the number of writes to a report entry.
+type GenerationErr struct {
+	Got       uint64
+	Want      uint64
+	Attribute string
+}
+
+// Error returns the human-readable explanation for the error.
+func (e *GenerationErr) Error() string {
+	return fmt.Sprintf("report generation was %d when expecting %d while reading property %q",
+		e.Got, e.Want, e.Attribute)
+}
+
+// GetGenerationErr returns the GenerationErr contained in an error with 0 or 1 wraps.
+func GetGenerationErr(err error) *GenerationErr {
+	var result *GenerationErr
+	if err != nil && (errors.As(err, &result) || errors.As(errors.Unwrap(err), &result)) {
+		return result
+	}
+	return nil
+}
+
 func (r *OpenReport) attribute(subtree string) string {
 	a := *r.entry
 	a.Attribute = subtree
@@ -78,13 +101,20 @@ func readUint64File(client configfsi.Client, p string) (uint64, error) {
 // CreateOpenReport returns a newly-created entry in the configfs-tsm report subtree with an initial
 // expected generation value.
 func CreateOpenReport(client configfsi.Client) (*OpenReport, error) {
-	r := &OpenReport{client: client}
-	entry, err := client.MkdirTemp(subsystemPath, uuid.New().String())
+	entry, err := client.MkdirTemp(subsystemPath, "entry")
 	if err != nil {
 		return nil, fmt.Errorf("could not create report entry in configfs: %v", err)
 	}
-	p, _ := configfsi.ParseTsmPath(entry)
-	r.entry = &configfsi.TsmPath{Subsystem: subsystem, Entry: p.Entry}
+	return UnsafeWrap(client, entry)
+}
+
+// UnsafeWrap returns a new OpenReport for a given report entry.
+func UnsafeWrap(client configfsi.Client, entryPath string) (r *OpenReport, err error) {
+	p, _ := configfsi.ParseTsmPath(entryPath)
+	r = &OpenReport{
+		client: client,
+		entry:  &configfsi.TsmPath{Subsystem: subsystem, Entry: p.Entry},
+	}
 	r.expectedGeneration, err = readUint64File(client, r.attribute("generation"))
 	if err != nil {
 		// The report was created but couldn't be properly initialized.
@@ -153,8 +183,7 @@ func (r *OpenReport) ReadOption(subtree string) ([]byte, error) {
 		return nil, err
 	}
 	if gotGeneration != r.expectedGeneration {
-		return nil, fmt.Errorf("report generation was %d when expecting %d while reading property %q",
-			gotGeneration, r.expectedGeneration, subtree)
+		return nil, &GenerationErr{Got: gotGeneration, Want: r.expectedGeneration, Attribute: subtree}
 	}
 	return data, nil
 }
@@ -176,12 +205,12 @@ func (r *OpenReport) Get() (*Response, error) {
 	if r.GetAuxBlob {
 		resp.AuxBlob, err = r.ReadOption("auxblob")
 		if err != nil {
-			return nil, fmt.Errorf("could not read report auxblob: %v", err)
+			return nil, fmt.Errorf("could not read report auxblob: %w", err)
 		}
 	}
 	resp.OutBlob, err = r.ReadOption("outblob")
 	if err != nil {
-		return nil, fmt.Errorf("could not read report outblob: %v", err)
+		return nil, fmt.Errorf("could not read report outblob: %w", err)
 	}
 	providerData, err := r.ReadOption("provider")
 	if err != nil {
