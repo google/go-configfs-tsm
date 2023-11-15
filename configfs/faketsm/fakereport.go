@@ -23,7 +23,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"strconv"
 	"sync"
 	"syscall"
 	"unicode/utf8"
@@ -37,6 +36,7 @@ const (
 	// subsystemName is the expected subsystem path entry under tsm for reports.
 	subsystemName = "report"
 	tsmInBlobSize = 64
+	renderBase    = 10
 )
 
 // ReportAttributeState rewrites a writable attribute's value state. May also be readable.
@@ -119,7 +119,7 @@ func (e *ReportEntry) readCached(attr string) ([]byte, error) {
 	// The only special attribute is "generation", since it peers into the
 	// mechanics of mutation.
 	if attr == "generation" {
-		return []byte(strconv.FormatUint(e.WriteGeneration, 10)), nil
+		return []byte(fmt.Sprintf("%d\n", e.WriteGeneration)), nil
 	}
 	if e.ReadGeneration != e.WriteGeneration {
 		return nil, syscall.EWOULDBLOCK
@@ -239,9 +239,11 @@ func (r *ReportSubsystem) RemoveAll(name string) error {
 	return nil
 }
 
-func renderOutBlob(privlevel string, inblob []byte) []byte {
-	return []byte(fmt.Sprintf("privlevel: %s\ninblob: %s",
-		privlevel,
+func renderOutBlob(privlevel, inblob []byte) []byte {
+	// checkv7 already ensures this does not error
+	priv, _ := configfsi.Kstrtouint(privlevel, renderBase, 2)
+	return []byte(fmt.Sprintf("privlevel: %d\ninblob: %s",
+		priv,
 		hex.EncodeToString(inblob)))
 }
 
@@ -249,13 +251,13 @@ func readV7(privlevelFloor uint) func(*ReportEntry, string) ([]byte, error) {
 	return func(e *ReportEntry, attr string) ([]byte, error) {
 		switch attr {
 		case "provider":
-			return []byte("fake"), nil
+			return []byte("fake\n"), nil
 		case "auxblob":
 			return []byte(`auxblob`), nil
 		case "outblob":
-			privlevel := "<missing>"
+			privlevel := []byte("<missing>")
 			if a, ok := e.InAttrs["privlevel"]; ok && len(a.Value) > 0 {
-				privlevel = string(a.Value)
+				privlevel = a.Value
 			}
 			inblob, ok := e.InAttrs["inblob"]
 			if !ok || len(inblob.Value) == 0 {
@@ -263,7 +265,7 @@ func readV7(privlevelFloor uint) func(*ReportEntry, string) ([]byte, error) {
 			}
 			return renderOutBlob(privlevel, inblob.Value), nil
 		case "privlevel_floor":
-			return []byte(strconv.FormatUint(uint64(privlevelFloor), 10)), nil
+			return []byte(fmt.Sprintf("%d\n", privlevelFloor)), nil
 		}
 		return nil, os.ErrNotExist
 	}
@@ -272,7 +274,7 @@ func readV7(privlevelFloor uint) func(*ReportEntry, string) ([]byte, error) {
 func makeV7() *ReportEntry {
 	return &ReportEntry{
 		InAttrs: map[string]*ReportAttributeState{
-			"privlevel": {Value: []byte("0")},
+			"privlevel": {Value: []byte("0\n")},
 			"inblob":    {},
 		},
 	}
@@ -289,7 +291,7 @@ func checkV7(privlevelFloor uint) func(*ReportEntry, string, []byte) error {
 			if !utf8.Valid(contents) {
 				return ErrPrivLevelFormat
 			}
-			level, err := strconv.ParseUint(string(contents), 10, 2)
+			level, err := configfsi.Kstrtouint(contents, renderBase, 2)
 			if err != nil {
 				return ErrPrivLevelFormat
 			}

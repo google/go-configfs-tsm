@@ -37,8 +37,9 @@ func TestGet(t *testing.T) {
 	if !bytes.Equal(resp.OutBlob, []byte(wantOut)) {
 		t.Errorf("OutBlob %v is not %v", string(resp.OutBlob), wantOut)
 	}
-	if resp.Provider != "fake" {
-		t.Errorf("provider = %q, want \"fake\"", resp.Provider)
+	wantProvider := "fake\n"
+	if resp.Provider != wantProvider {
+		t.Errorf("provider = %q, want %q", resp.Provider, wantProvider)
 	}
 	if !bytes.Equal(resp.AuxBlob, []byte(`auxblob`)) {
 		t.Errorf("auxblob = %v, want %v", resp.AuxBlob, []byte(`auxblob`))

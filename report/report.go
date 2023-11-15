@@ -19,21 +19,21 @@ package report
 import (
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/google/go-configfs-tsm/configfs/configfsi"
 	"go.uber.org/multierr"
 )
 
 const (
-	subsystem     = "report"
-	subsystemPath = configfsi.TsmPrefix + "/" + subsystem
+	subsystem           = "report"
+	subsystemPath       = configfsi.TsmPrefix + "/" + subsystem
+	numberAttributeBase = 10
 )
 
 // Privilege represents the requested privilege information at which a report should
 // be created.
 type Privilege struct {
-	Level int
+	Level uint
 }
 
 // Request represents an open request for an attestation report.
@@ -95,7 +95,7 @@ func readUint64File(client configfsi.Client, p string) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("could not read %q: %v", p, err)
 	}
-	return strconv.ParseUint(string(data), 10, 64)
+	return configfsi.Kstrtouint(data, numberAttributeBase, 64)
 }
 
 // CreateOpenReport returns a newly-created entry in the configfs-tsm report subtree with an initial
@@ -148,17 +148,17 @@ func (r *OpenReport) Destroy() error {
 	return nil
 }
 
-// PrivilegeLevelFloor returns the privlevel_floor attribute interpreted as the int type it is.
-func (r *OpenReport) PrivilegeLevelFloor() (int, error) {
+// PrivilegeLevelFloor returns the privlevel_floor attribute interpreted as the uint type it is.
+func (r *OpenReport) PrivilegeLevelFloor() (uint, error) {
 	data, err := r.ReadOption("privlevel_floor")
 	if err != nil {
 		return 0, err
 	}
-	i, err := strconv.ParseInt(string(data), 10, 32)
+	i, err := configfsi.Kstrtouint(data, numberAttributeBase, 32)
 	if err != nil {
 		return 0, fmt.Errorf("could not parse privlevel_floor data %v as int: %v", data, err)
 	}
-	return int(i), nil
+	return uint(i), nil
 }
 
 // WriteOption sets a configfs report option to the provided data and internally tracks

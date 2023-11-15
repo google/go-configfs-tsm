@@ -25,15 +25,15 @@ import (
 	"github.com/google/go-configfs-tsm/report"
 )
 
-func checkOutblobExpectation(inblob []byte, privlevel int, outblob []byte) error {
-	want := renderOutBlob(fmt.Sprintf("%d", privlevel), inblob)
+func checkOutblobExpectation(inblob []byte, privlevel uint, outblob []byte) error {
+	want := renderOutBlob([]byte(fmt.Sprintf("%d\n", privlevel)), inblob)
 	if !bytes.Equal(want, outblob) {
 		return fmt.Errorf("got %q, want %q", string(outblob), string(want))
 	}
 	return nil
 }
 
-func makeNonce(id int) []byte {
+func makeNonce(id uint) []byte {
 	// The nonce is currently expected to always be size 64.
 	result := make([]byte, 64)
 	copy(result, []byte(big.NewInt(int64(id)).String()))
@@ -78,7 +78,7 @@ func runIteration(t testing.TB, c configfsi.Client, r *report.OpenReport, tc *ru
 
 type runner struct {
 	iterations int
-	id         int
+	id         uint
 	done       chan int
 }
 
@@ -138,7 +138,7 @@ func nonceAnonceB(t testing.TB, clients, iterations int) {
 	for i := 0; i < clients; i++ {
 		go runInterference(t, c, entryPath, &runner{
 			iterations: iterations,
-			id:         i,
+			id:         uint(i),
 			done:       complete})
 	}
 	// Each client should write to the channel.
@@ -158,7 +158,7 @@ func noninterferenceByDesign(t testing.TB, clients, iterations int) {
 	for i := 0; i < clients; i++ {
 		go runNoninterference(t, c, &runner{
 			iterations: iterations,
-			id:         i,
+			id:         uint(i),
 			done:       complete})
 	}
 	// Each client should write to the channel.
