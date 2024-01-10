@@ -175,5 +175,5 @@ func BenchmarkReportGenerationInterference(b *testing.B) {
 }
 
 func BenchmarkReportGenerationNoninterference(b *testing.B) {
-	nonceAnonceB(b, 20, b.N)
+	noninterferenceByDesign(b, 20, b.N)
 }
