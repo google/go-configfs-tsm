@@ -75,7 +75,7 @@ func (r *Extend) getTcgMap() ([]byte, error) {
 	return r.client.ReadFile(r.attribute(tsmPathTcgMap))
 }
 
-// validateIndex checks if the rtmr index is valid.
+// validateIndex checks if the rtmr index match the expected value.
 func (r *Extend) validateIndex() error {
 	indexBytes, err := r.client.ReadFile(r.attribute(tsmPathIndex))
 	if err != nil {
@@ -83,9 +83,9 @@ func (r *Extend) validateIndex() error {
 	}
 	index, err := configfsi.Kstrtouint(indexBytes, 10, 64)
 	if err != nil {
-		return fmt.Errorf("could not convert index %s to integer: %v", indexBytes, err)
+		return err
 	}
-	if (int)(index) != r.RtmrIndex {
+	if int(index) != r.RtmrIndex {
 		return fmt.Errorf("rtmr index %d does not match the expected index %d", index, r.RtmrIndex)
 	}
 	return nil
@@ -130,19 +130,14 @@ func searchRtmrInterface(client configfsi.Client, index int) (*Extend, error) {
 		return nil, err
 	}
 
-	if err := out.validateIndex(); err != nil {
-		return out, nil
-	} else {
-		return nil, err
-	}
-
+	return out, out.validateIndex()
 }
 
 // createRtmrInterface creates a new rtmr entry in the configfs.
 func createRtmrInterface(client configfsi.Client, index int) (*Extend, error) {
 	entryPath, err := client.MkdirTemp(tsmRtmrPrefix, fmt.Sprintf("rtmr%d-", index))
 	if err != nil {
-		return nil, fmt.Errorf("could not create rtmr entry in configfs: %v", err)
+		return nil, err
 	}
 	p, _ := configfsi.ParseTsmPath(entryPath)
 

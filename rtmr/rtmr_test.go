@@ -32,6 +32,7 @@ func TestExtendDigestErr(t *testing.T) {
 	}{
 		{rtmr: 1, digest: sha384Hash[:], wantErr: "could not write digest to rmtr1"},
 		{rtmr: 3, digest: []byte("aaaaaaaa"), wantErr: "the length of the digest must be 48 bytes"},
+		{rtmr: -1, digest: sha384Hash[:], wantErr: "invalid rtmr index -1. Index can only be a non-negative number"},
 	}
 	client := fakertmr.CreateRtmrSubsystem()
 	for _, tc := range tcsErr {
@@ -62,7 +63,23 @@ func TestExtendDigestRtmrOk(t *testing.T) {
 	}
 }
 
-func TestGetDigest(t *testing.T) {
+func TestGetDigestErr(t *testing.T) {
+	tcsErr := []struct {
+		rtmr    int
+		wantErr string
+	}{
+		{rtmr: -1, wantErr: "invalid rtmr index -1. Index can only be a non-negative number"},
+	}
+	client := fakertmr.CreateRtmrSubsystem()
+	for _, tc := range tcsErr {
+		_, err := GetDigest(client, tc.rtmr)
+		if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+			t.Fatalf("GetDigestRtmr(%d) failed: %v, want %q", tc.rtmr, err, tc.wantErr)
+		}
+	}
+}
+
+func TestGetDigestOk(t *testing.T) {
 	var sha384Hash [48]byte
 	tcsOk := []struct {
 		rtmr   int
