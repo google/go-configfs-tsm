@@ -76,19 +76,19 @@ func (r *Extend) getTcgMap() ([]byte, error) {
 }
 
 // validateIndex checks if the rtmr index match the expected value.
-func (r *Extend) validateIndex() error {
+func (r *Extend) validateIndex() bool {
 	indexBytes, err := r.client.ReadFile(r.attribute(tsmPathIndex))
 	if err != nil {
-		return fmt.Errorf("could not read index %s: %v", r.attribute(tsmPathIndex), err)
+		return false
 	}
 	index, err := configfsi.Kstrtouint(indexBytes, 10, 64)
 	if err != nil {
-		return err
+		return false
 	}
 	if int(index) != r.RtmrIndex {
-		return fmt.Errorf("rtmr index %d does not match the expected index %d", index, r.RtmrIndex)
+		return false
 	}
-	return nil
+	return true
 }
 
 // setRtmrIndex sets a configfs rtmr entry to the given index.
@@ -103,7 +103,7 @@ func (r *Extend) setRtmrIndex() error {
 }
 
 // searchRtmrInterface searches for an rtmr entry in the configfs.
-func searchRtmrInterface(client configfsi.Client, index int) (*Extend, error) {
+func searchRtmrInterface(client configfsi.Client, index int) *Extend {
 	root := tsmRtmrPrefix
 	out := &Extend{}
 	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -120,17 +120,16 @@ func searchRtmrInterface(client configfsi.Client, index int) (*Extend, error) {
 				entry:     &configfsi.TsmPath{Subsystem: rtmrSubsystem, Entry: p.Entry},
 				client:    client,
 			}
-			if r.validateIndex() == nil {
+			if r.validateIndex() {
 				out = r
 				return nil
 			}
 		}
 		return nil
-	}); err != nil {
-		return nil, err
+	}); err != nil || !out.validateIndex() {
+		return nil
 	}
-
-	return out, out.validateIndex()
+	return out
 }
 
 // createRtmrInterface creates a new rtmr entry in the configfs.
@@ -157,8 +156,9 @@ func createRtmrInterface(client configfsi.Client, index int) (*Extend, error) {
 func getRtmrInterface(client configfsi.Client, index int) (*Extend, error) {
 	// The configfs-tsm interface only allows one rtmr entry for a given index.
 	// If the rtmr entry already exists, we should extend the digest to it.
-	r, err := searchRtmrInterface(client, index)
-	if err != nil {
+	var err error
+	r := searchRtmrInterface(client, index)
+	if r == nil {
 		r, err = createRtmrInterface(client, index)
 	}
 	return r, err
