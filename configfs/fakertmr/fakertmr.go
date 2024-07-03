@@ -39,24 +39,24 @@ const (
 
 // rtmrValue represents the value of a rtmr index.
 type rtmrValue struct {
-	RtmrIndex int
-	Digest    []byte
-	TcgMap    []byte
+	rtmrIndex int
+	digest    []byte
+	tcgMap    []byte
 }
 
 // rtmrEntry represents a rtmr entry in the configfs.
 type rtmrEntry struct {
-	RtmrIndex   int
-	Initialized bool
-	// RtmrMaps is a map of rtmr index to rtmr value.
+	rtmrIndex   int
+	initialized bool
+	// rtmrMaps is a map of rtmr index to rtmr value.
 	// All RrmrMaps must be initialized with the value from RtmrSubsystem.
-	RtmrMaps map[int]*rtmrValue
+	rtmrMaps map[int]*rtmrValue
 }
 
 // RtmrSubsystem represents a fake configfs-tsm rtmr subsystem.
 type RtmrSubsystem struct {
 	// WriteAttr called on any WriteFile to an attribute.
-	WriteInAttr func(e *rtmrEntry, attr string, contents []byte) error
+	WriteAttr func(e *rtmrEntry, attr string, contents []byte) error
 	// ReadAttr is called on any non-InAddr key.
 	ReadAttr func(e *rtmrEntry, attr string) ([]byte, error)
 	// Random is the source of randomness to use for MkdirTemp
@@ -73,16 +73,16 @@ func (r *RtmrSubsystem) RemoveAll(path string) error {
 }
 
 func readTdx(entry *rtmrEntry, attr string) ([]byte, error) {
-	if !entry.Initialized {
+	if !entry.initialized {
 		return nil, os.ErrNotExist
 	}
 	switch attr {
 	case tsmRtmrDigest:
-		return entry.RtmrMaps[entry.RtmrIndex].Digest, nil
+		return entry.rtmrMaps[entry.rtmrIndex].digest, nil
 	case tsmPathIndex:
-		return []byte(strconv.Itoa(entry.RtmrIndex)), nil
+		return []byte(strconv.Itoa(entry.rtmrIndex)), nil
 	case tsmPathTcgMap:
-		return entry.RtmrMaps[entry.RtmrIndex].TcgMap, nil
+		return entry.rtmrMaps[entry.rtmrIndex].tcgMap, nil
 	}
 	return nil, os.ErrNotExist
 }
@@ -93,24 +93,24 @@ func writeTdx(entry *rtmrEntry, attr string, content []byte) error {
 		if len(content) != crypto.SHA384.Size() {
 			return syscall.EINVAL
 		}
-		if !entry.Initialized {
+		if !entry.initialized {
 			return os.ErrNotExist
 		}
 		// According to the TDX module spec, userspace can only extend rtmr2 or rtmr3
-		if entry.RtmrIndex != 2 && entry.RtmrIndex != 3 {
+		if entry.rtmrIndex != 2 && entry.rtmrIndex != 3 {
 			return os.ErrPermission
 		}
-		oldDigest := entry.RtmrMaps[entry.RtmrIndex].Digest
+		oldDigest := entry.rtmrMaps[entry.rtmrIndex].digest
 		newDigest := sha512.Sum384(append(oldDigest[:], content...))
-		entry.RtmrMaps[entry.RtmrIndex].Digest = newDigest[:]
+		entry.rtmrMaps[entry.rtmrIndex].digest = newDigest[:]
 	case tsmPathIndex:
 		index, e := strconv.Atoi(string(content))
 		if e != nil {
 			return fmt.Errorf("WriteTdx: %v", e)
 		}
-		entry.RtmrIndex = index
-		entry.Initialized = true
-		value := entry.RtmrMaps[index]
+		entry.rtmrIndex = index
+		entry.initialized = true
+		value := entry.rtmrMaps[index]
 		var rtmrPcrMaps = map[int]string{
 			0: "1,7\n",
 			1: "2-6\n",
@@ -119,11 +119,11 @@ func writeTdx(entry *rtmrEntry, attr string, content []byte) error {
 		}
 		if value == nil {
 			value = &rtmrValue{
-				RtmrIndex: index,
-				Digest:    make([]byte, crypto.SHA384.Size()),
-				TcgMap:    []byte(rtmrPcrMaps[index]),
+				rtmrIndex: index,
+				digest:    make([]byte, crypto.SHA384.Size()),
+				tcgMap:    []byte(rtmrPcrMaps[index]),
 			}
-			entry.RtmrMaps[index] = value
+			entry.rtmrMaps[index] = value
 		}
 	default:
 		return fmt.Errorf("WriteTdx: unknown attribute %q", attr)
@@ -148,7 +148,7 @@ func (r *RtmrSubsystem) MkdirTemp(dir, pattern string) (string, error) {
 	if _, ok := r.Entries[name]; ok {
 		return "", os.ErrExist
 	}
-	r.Entries[name] = &rtmrEntry{Initialized: false, RtmrMaps: r.RtmrMaps}
+	r.Entries[name] = &rtmrEntry{initialized: false, rtmrMaps: r.RtmrMaps}
 	return path.Join(dir, name), nil
 }
 
@@ -181,17 +181,17 @@ func (r *RtmrSubsystem) WriteFile(name string, content []byte) error {
 	if !ok || entry == nil {
 		return os.ErrNotExist
 	}
-	return r.WriteInAttr(entry, p.Attribute, content)
+	return r.WriteAttr(entry, p.Attribute, content)
 }
 
 // CreateRtmrSubsystem creates a new rtmr subsystem.
 // The current subsystem only supports TDX.
 func CreateRtmrSubsystem() *RtmrSubsystem {
 	return &RtmrSubsystem{
-		Random:      rand.Reader,
-		WriteInAttr: writeTdx,
-		ReadAttr:    readTdx,
-		RtmrMaps:    make(map[int]*rtmrValue),
-		Entries:     make(map[string]*rtmrEntry),
+		Random:    rand.Reader,
+		WriteAttr: writeTdx,
+		ReadAttr:  readTdx,
+		RtmrMaps:  make(map[int]*rtmrValue),
+		Entries:   make(map[string]*rtmrEntry),
 	}
 }
