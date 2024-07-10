@@ -63,6 +63,26 @@ func TestExtendDigestRtmrOk(t *testing.T) {
 	}
 }
 
+func TestExtendDigestRtmrWithExistingEntriesOk(t *testing.T) {
+	var sha384Hash [48]byte
+
+	tcsOk := []struct {
+		rtmr   int
+		digest []byte
+	}{
+		{rtmr: 2, digest: sha384Hash[:]},
+		{rtmr: 3, digest: sha384Hash[:]},
+		{rtmr: 3, digest: sha384Hash[:]},
+	}
+	client := fakertmr.CreateRtmrSubsystemWithEntries()
+	for _, tc := range tcsOk {
+		err := ExtendDigest(client, tc.rtmr, tc.digest)
+		if err != nil {
+			t.Fatalf("ExtendtoRtmrClient (%d, %q) failed: %v", tc.rtmr, tc.digest, err)
+		}
+	}
+}
+
 func TestGetDigestErr(t *testing.T) {
 	tcsErr := []struct {
 		rtmr    int

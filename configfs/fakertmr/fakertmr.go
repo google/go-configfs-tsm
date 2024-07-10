@@ -23,8 +23,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"syscall"
 
@@ -65,6 +67,8 @@ type RtmrSubsystem struct {
 	RtmrMaps map[int]*rtmrValue
 	// Entries is a map of rtmr entry name to rtmr entry.
 	Entries map[string]*rtmrEntry
+	// If set true, ReadDir will returns a list of directory entries.
+	SetEntries bool
 }
 
 // RemoveAll implements configfsi.Client.
@@ -131,6 +135,30 @@ func writeTdx(entry *rtmrEntry, attr string, content []byte) error {
 	return nil
 }
 
+// ReadDir reads the directory named by dirname
+// and returns a list of directory entries sorted by filename.
+func (r *RtmrSubsystem) ReadDir(dirname string) ([]os.DirEntry, error) {
+	if r.SetEntries == false {
+		return nil, os.ErrNotExist
+	}
+	rtmrDirs, err := os.MkdirTemp(os.TempDir(), "rtmr")
+	if err != nil {
+		return nil, fmt.Errorf("ReadDir: %v", err)
+	}
+	rtmr := [4]int{0, 1, 2, 3}
+	for _, index := range rtmr {
+		entryPath, err := os.MkdirTemp(rtmrDirs, fmt.Sprintf("rtmr%d-", index))
+		if err != nil {
+			log.Fatalf("MkdirTemp: %v", err)
+		}
+		index_file := filepath.Join(entryPath, tsmPathIndex)
+		if err := os.WriteFile(index_file, []byte(fmt.Sprintf("%v", index)), 0666); err != nil {
+			log.Fatalf("WriteFile: %v", err)
+		}
+	}
+	return os.ReadDir(rtmrDirs)
+}
+
 // MkdirTemp creates a new temporary directory in the rtmr subsystem.
 func (r *RtmrSubsystem) MkdirTemp(dir, pattern string) (string, error) {
 	p, err := configfsi.ParseTsmPath(dir)
@@ -188,10 +216,25 @@ func (r *RtmrSubsystem) WriteFile(name string, content []byte) error {
 // The current subsystem only supports TDX.
 func CreateRtmrSubsystem() *RtmrSubsystem {
 	return &RtmrSubsystem{
-		Random:    rand.Reader,
-		WriteAttr: writeTdx,
-		ReadAttr:  readTdx,
-		RtmrMaps:  make(map[int]*rtmrValue),
-		Entries:   make(map[string]*rtmrEntry),
+		Random:     rand.Reader,
+		WriteAttr:  writeTdx,
+		ReadAttr:   readTdx,
+		RtmrMaps:   make(map[int]*rtmrValue),
+		Entries:    make(map[string]*rtmrEntry),
+		SetEntries: false,
+	}
+}
+
+// CreateRtmrSubsystemEntry creates a new rtmr subsystem.
+// The fake susbsystem has set the interface.
+// The current subsystem only supports TDX.
+func CreateRtmrSubsystemWithEntries() *RtmrSubsystem {
+	return &RtmrSubsystem{
+		Random:     rand.Reader,
+		WriteAttr:  writeTdx,
+		ReadAttr:   readTdx,
+		RtmrMaps:   make(map[int]*rtmrValue),
+		Entries:    make(map[string]*rtmrEntry),
+		SetEntries: true,
 	}
 }

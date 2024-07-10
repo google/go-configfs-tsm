@@ -19,8 +19,6 @@ package rtmr
 import (
 	"crypto"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/google/go-configfs-tsm/configfs/configfsi"
@@ -75,8 +73,11 @@ func (r *Extend) getTcgMap() ([]byte, error) {
 	return r.client.ReadFile(r.attribute(tsmPathTcgMap))
 }
 
-// validateIndex checks if the rtmr index match the expected value.
+// validateIndex checks if the rtmr index matches the expected value.
 func (r *Extend) validateIndex() bool {
+	if r == nil {
+		return false
+	}
 	indexBytes, err := r.client.ReadFile(r.attribute(tsmPathIndex))
 	if err != nil {
 		return false
@@ -105,29 +106,23 @@ func (r *Extend) setRtmrIndex() error {
 // searchRtmrInterface searches for an rtmr entry in the configfs.
 func searchRtmrInterface(client configfsi.Client, index int) *Extend {
 	root := tsmRtmrPrefix
-	out := &Extend{}
-	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() {
-			p, err := configfsi.ParseTsmPath(path)
-			if err != nil {
-				return err
-			}
+	var out *Extend
+	entries, err := client.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+	for _, d := range entries {
+		if d.IsDir() {
 			r := &Extend{
 				RtmrIndex: index,
-				entry:     &configfsi.TsmPath{Subsystem: rtmrSubsystem, Entry: p.Entry},
+				entry:     &configfsi.TsmPath{Subsystem: rtmrSubsystem, Entry: d.Name()},
 				client:    client,
 			}
 			if r.validateIndex() {
 				out = r
-				return nil
+				break
 			}
 		}
-		return nil
-	}); err != nil || !out.validateIndex() {
-		return nil
 	}
 	return out
 }
