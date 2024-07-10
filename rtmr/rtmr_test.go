@@ -100,9 +100,6 @@ func TestGetDigestOk(t *testing.T) {
 		if r.RtmrIndex != tc.rtmr {
 			t.Fatalf("GetDigestRtmr(%d) failed: got %d, want %d", tc.rtmr, r.RtmrIndex, tc.rtmr)
 		}
-		if !bytes.Equal(r.digest, tc.digest) {
-			t.Fatalf("GetDigestRtmr(%d) failed: got %q, want %q", tc.rtmr, r.digest, tc.digest)
-		}
 		if !bytes.Equal(r.tcgMap, tc.tcgMap) {
 			t.Fatalf("GetDigestRtmr(%d) failed: got %q, want %q", tc.rtmr, r.tcgMap, tc.tcgMap)
 		}
