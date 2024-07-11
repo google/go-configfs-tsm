@@ -148,10 +148,8 @@ func (r *RtmrSubsystem) MkdirTemp(dir, pattern string) (string, error) {
 	if p.Entry != "" {
 		return "", fmt.Errorf("MkdirTemp: rtmr entry %q cannot have subdirectories", dir)
 	}
-	if _, err := os.Stat(r.Path); os.IsNotExist(err) {
-		if err = os.Mkdir(r.Path, 0755); err != nil {
-			return "", fmt.Errorf("MkdirTemp: %v", err)
-		}
+	if err = os.MkdirAll(r.Path, 0755); err != nil {
+		return "", fmt.Errorf("MkdirTemp: %v", err)
 	}
 	name := configfsi.TempName(r.Random, pattern)
 	fakeRtmrPath := path.Join(r.Path, name)
