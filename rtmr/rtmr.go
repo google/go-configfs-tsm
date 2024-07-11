@@ -106,7 +106,6 @@ func (r *Extend) setRtmrIndex() error {
 // searchRtmrInterface searches for an rtmr entry in the configfs.
 func searchRtmrInterface(client configfsi.Client, index int) *Extend {
 	root := tsmRtmrPrefix
-	var out *Extend
 	entries, err := client.ReadDir(root)
 	if err != nil {
 		return nil
@@ -119,12 +118,11 @@ func searchRtmrInterface(client configfsi.Client, index int) *Extend {
 				client:    client,
 			}
 			if r.validateIndex() {
-				out = r
-				break
+				return r
 			}
 		}
 	}
-	return out
+	return nil
 }
 
 // createRtmrInterface creates a new rtmr entry in the configfs.

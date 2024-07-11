@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -67,7 +66,7 @@ type RtmrSubsystem struct {
 	RtmrMaps map[int]*rtmrValue
 	// Entries is a map of rtmr entry name to rtmr entry.
 	Entries map[string]*rtmrEntry
-	// If set true, ReadDir will returns a list of directory entries.
+	// If set true, ReadDir will return a list of directory entries.
 	SetEntries bool
 }
 
@@ -149,11 +148,11 @@ func (r *RtmrSubsystem) ReadDir(dirname string) ([]os.DirEntry, error) {
 	for _, index := range rtmr {
 		entryPath, err := os.MkdirTemp(rtmrDirs, fmt.Sprintf("rtmr%d-", index))
 		if err != nil {
-			log.Fatalf("MkdirTemp: %v", err)
+			return nil, fmt.Errorf("ReadDir: %v", err)
 		}
 		index_file := filepath.Join(entryPath, tsmPathIndex)
 		if err := os.WriteFile(index_file, []byte(fmt.Sprintf("%v", index)), 0666); err != nil {
-			log.Fatalf("WriteFile: %v", err)
+			return nil, fmt.Errorf("ReadDir: %v", err)
 		}
 	}
 	return os.ReadDir(rtmrDirs)
