@@ -52,6 +52,7 @@ func TestExtendDigestRtmrOk(t *testing.T) {
 	}{
 		{rtmr: 2, digest: sha384Hash[:]},
 		{rtmr: 3, digest: sha384Hash[:]},
+		// Test the same rtmr index with an existing entry.
 		{rtmr: 3, digest: sha384Hash[:]},
 	}
 	client := fakertmr.CreateRtmrSubsystem()
@@ -90,6 +91,8 @@ func TestGetDigestOk(t *testing.T) {
 		{rtmr: 1, digest: sha384Hash[:], tcgMap: []byte("2-6\n")},
 		{rtmr: 2, digest: sha384Hash[:], tcgMap: []byte("8-15\n")},
 		{rtmr: 3, digest: sha384Hash[:], tcgMap: []byte("\n")},
+		// Test the same rtmr index with an existing entry.
+		{rtmr: 2, digest: sha384Hash[:], tcgMap: []byte("8-15\n")},
 	}
 	client := fakertmr.CreateRtmrSubsystem()
 	for _, tc := range tcsOk {

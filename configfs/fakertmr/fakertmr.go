@@ -33,15 +33,16 @@ import (
 )
 
 const (
-	tsmRtmrDigest = "digest"
-	tsmPathIndex  = "index"
-	tsmPathTcgMap = "tcg_map"
+	tsmRtmrDigest    = "digest"
+	tsmPathIndex     = "index"
+	tsmPathTcgMap    = "tcg_map"
+	tsmRtmrSubsystem = "rtmr"
 )
 
 // RtmrSubsystem represents a fake configfs-tsm rtmr subsystem.
 type RtmrSubsystem struct {
 	// WriteAttr called on any WriteFile to an attribute.
-	WriteAttr func(dirname string, attr string, contents []byte) error
+	WriteAttr func(dirname string, attr string, contents []byte, indexMap map[int]bool) error
 	// ReadAttr is called on any non-InAddr key.
 	ReadAttr func(dirname string, attr string) ([]byte, error)
 	// Random is the source of randomness to use for MkdirTemp
@@ -49,6 +50,9 @@ type RtmrSubsystem struct {
 	// We use a temp folder to store the rtmr entries.
 	// The path to the fake rtmr subsystem.
 	Path string
+	// rtmrIndexMap contains set of rtmr indexes that have been initialized.
+	// If true, the rtmr index is initialized.
+	rtmrIndexMap map[int]bool
 }
 
 // RemoveAll implements configfsi.Client.
@@ -60,7 +64,7 @@ func readTdx(entry string, attr string) ([]byte, error) {
 	return os.ReadFile(path.Join(entry, attr))
 }
 
-func writeTdx(entry string, attr string, content []byte) error {
+func writeTdx(entry string, attr string, content []byte, indexMap map[int]bool) error {
 	switch attr {
 	case tsmRtmrDigest:
 		// Check if the content is a valid SHA384 hash.
@@ -95,6 +99,10 @@ func writeTdx(entry string, attr string, content []byte) error {
 		if rtmrIndex < 0 || rtmrIndex > 3 {
 			return fmt.Errorf("WriteTdx: invalid rtmr index %d. Index can only be a non-negative number", rtmrIndex)
 		}
+		if indexMap[rtmrIndex] {
+			return syscall.EBUSY
+		}
+		indexMap[rtmrIndex] = true
 		if err := os.WriteFile(filepath.Join(entry, tsmPathIndex), content, 0666); err != nil {
 			return err
 		}
@@ -104,9 +112,14 @@ func writeTdx(entry string, attr string, content []byte) error {
 			2: "8-15\n",
 			3: "\n",
 		}
-		if err := os.WriteFile(filepath.Join(entry, tsmPathTcgMap), []byte(rtmrPcrMaps[rtmrIndex]), 0666); err != nil {
+		tempTsmPathTcgMap := filepath.Join(os.TempDir(), tsmRtmrSubsystem, tsmPathTcgMap)
+		if err := os.WriteFile(tempTsmPathTcgMap, []byte(rtmrPcrMaps[rtmrIndex]), 0400); err != nil {
 			return err
 		}
+		if err := os.Rename(tempTsmPathTcgMap, filepath.Join(entry, tsmPathTcgMap)); err != nil {
+			return err
+		}
+
 	case tsmPathTcgMap:
 		return os.ErrPermission
 	default:
@@ -128,17 +141,6 @@ func (r *RtmrSubsystem) ReadDir(dirname string) ([]os.DirEntry, error) {
 	return os.ReadDir(r.Path)
 }
 
-func createEmptyFile(path string) error {
-	f, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	return nil
-}
-
 // MkdirTemp creates a new temporary directory in the rtmr subsystem.
 func (r *RtmrSubsystem) MkdirTemp(dir, pattern string) (string, error) {
 	p, err := configfsi.ParseTsmPath(dir)
@@ -157,18 +159,16 @@ func (r *RtmrSubsystem) MkdirTemp(dir, pattern string) (string, error) {
 		return "", fmt.Errorf("MkdirTemp: %v", err)
 	}
 	// Create empty index, digest and tcg_map files.
-	if err = createEmptyFile(filepath.Join(fakeRtmrPath, tsmPathIndex)); err != nil {
-		return "", fmt.Errorf("MkdirTemp: %v", err)
+	perms := []int{os.O_RDWR, os.O_RDWR, os.O_RDONLY}
+	modes := []os.FileMode{0600, 0600, 0400}
+	for i, attr := range []string{tsmPathIndex, tsmRtmrDigest, tsmPathTcgMap} {
+		p := filepath.Join(fakeRtmrPath, attr)
+		f, err := os.OpenFile(p, perms[i]|os.O_CREATE, modes[i])
+		if err != nil {
+			return "", fmt.Errorf("MkdirTemp: %v", err)
+		}
+		f.Close()
 	}
-
-	if err = createEmptyFile(filepath.Join(fakeRtmrPath, tsmRtmrDigest)); err != nil {
-		return "", fmt.Errorf("MkdirTemp: %v", err)
-	}
-
-	if err = createEmptyFile(filepath.Join(fakeRtmrPath, tsmPathTcgMap)); err != nil {
-		return "", fmt.Errorf("MkdirTemp: %v", err)
-	}
-
 	return path.Join(dir, name), nil
 }
 
@@ -190,7 +190,7 @@ func (r *RtmrSubsystem) WriteFile(name string, content []byte) error {
 	if p.Attribute == "" {
 		return fmt.Errorf("WriteFile: no attribute specified to %q", name)
 	}
-	return r.WriteAttr(path.Join(r.Path, p.Entry), p.Attribute, content)
+	return r.WriteAttr(path.Join(r.Path, p.Entry), p.Attribute, content, r.rtmrIndexMap)
 }
 
 // CreateRtmrSubsystem creates a new rtmr subsystem.
@@ -200,6 +200,6 @@ func CreateRtmrSubsystem() *RtmrSubsystem {
 		Random:    rand.Reader,
 		WriteAttr: writeTdx,
 		ReadAttr:  readTdx,
-		Path:      path.Join(os.TempDir(), "rtmr"),
+		Path:      path.Join(os.TempDir(), tsmRtmrSubsystem),
 	}
 }
