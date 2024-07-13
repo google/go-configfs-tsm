@@ -20,6 +20,7 @@ package faketsm
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/google/go-configfs-tsm/configfs/configfsi"
 )
@@ -43,6 +44,18 @@ func (c *Client) getSubsystem(name string) (configfsi.Client, error) {
 		return nil, fmt.Errorf("faketsm: unsupported subsystem %q", p.Subsystem)
 	}
 	return sub, nil
+}
+
+// ReadDir reads the directory named by dir and returns a list of directory entries.
+func (c *Client) ReadDir(dir string) ([]os.DirEntry, error) {
+	if dir == "" {
+		return nil, fmt.Errorf("faketsm doesn't implement empty directory behavior")
+	}
+	sub, err := c.getSubsystem(dir)
+	if err != nil {
+		return nil, err
+	}
+	return sub.ReadDir(dir)
 }
 
 // MkdirTemp creates a new temporary directory in the directory dir and returns the pathname

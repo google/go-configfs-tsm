@@ -142,6 +142,11 @@ func (e *ReportEntry) readCached(attr string) ([]byte, error) {
 
 }
 
+// ReadDir reads the directory named by dirname and returns a list of directory entries sorted by filename.
+func (r *ReportSubsystem) ReadDir(dirname string) ([]os.DirEntry, error) {
+	return nil, errors.New("report subsystem does not support ReadDir")
+}
+
 // ReadFile reads the named file and returns the contents.
 func (r *ReportSubsystem) ReadFile(name string) ([]byte, error) {
 	p, err := configfsi.ParseTsmPath(name)
