@@ -112,7 +112,7 @@ func writeTdx(entry string, attr string, content []byte, indexMap map[int]bool) 
 			2: "8-15\n",
 			3: "\n",
 		}
-		tempTsmPathTcgMap := filepath.Join(os.TempDir(), tsmRtmrSubsystem, tsmPathTcgMap)
+		tempTsmPathTcgMap := filepath.Join(os.TempDir(), tsmPathTcgMap)
 		if err := os.WriteFile(tempTsmPathTcgMap, []byte(rtmrPcrMaps[rtmrIndex]), 0400); err != nil {
 			return err
 		}
@@ -193,19 +193,14 @@ func (r *RtmrSubsystem) WriteFile(name string, content []byte) error {
 	return r.WriteAttr(path.Join(r.Path, p.Entry), p.Attribute, content, r.rtmrIndexMap)
 }
 
-// Close removes the temporary files in the fake rtmr subsystem.
-func (r *RtmrSubsystem) Close() error {
-	return os.RemoveAll(r.Path)
-}
-
 // CreateRtmrSubsystem creates a new rtmr subsystem.
 // The current subsystem only supports TDX.
-func CreateRtmrSubsystem() *RtmrSubsystem {
+func CreateRtmrSubsystem(tempDir string) *RtmrSubsystem {
 	return &RtmrSubsystem{
 		Random:       rand.Reader,
 		WriteAttr:    writeTdx,
 		ReadAttr:     readTdx,
-		Path:         path.Join(os.TempDir(), tsmRtmrSubsystem),
+		Path:         path.Join(tempDir, tsmRtmrSubsystem),
 		rtmrIndexMap: make(map[int]bool),
 	}
 }
