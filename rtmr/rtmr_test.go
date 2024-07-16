@@ -35,6 +35,7 @@ func TestExtendDigestErr(t *testing.T) {
 		{rtmr: -1, digest: sha384Hash[:], wantErr: "invalid rtmr index -1. Index can only be a non-negative number"},
 	}
 	client := fakertmr.CreateRtmrSubsystem()
+	defer client.Close()
 	for _, tc := range tcsErr {
 		err := ExtendDigest(client, tc.rtmr, tc.digest)
 		if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
@@ -56,6 +57,7 @@ func TestExtendDigestRtmrOk(t *testing.T) {
 		{rtmr: 3, digest: sha384Hash[:]},
 	}
 	client := fakertmr.CreateRtmrSubsystem()
+	defer client.Close()
 	for _, tc := range tcsOk {
 		err := ExtendDigest(client, tc.rtmr, tc.digest)
 		if err != nil {
@@ -72,6 +74,7 @@ func TestGetDigestErr(t *testing.T) {
 		{rtmr: -1, wantErr: "invalid rtmr index -1. Index can only be a non-negative number"},
 	}
 	client := fakertmr.CreateRtmrSubsystem()
+	defer client.Close()
 	for _, tc := range tcsErr {
 		_, err := GetDigest(client, tc.rtmr)
 		if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
@@ -95,6 +98,7 @@ func TestGetDigestOk(t *testing.T) {
 		{rtmr: 2, digest: sha384Hash[:], tcgMap: []byte("8-15\n")},
 	}
 	client := fakertmr.CreateRtmrSubsystem()
+	defer client.Close()
 	for _, tc := range tcsOk {
 		r, err := GetDigest(client, tc.rtmr)
 		if err != nil {
@@ -113,6 +117,7 @@ func TestGetRtmrDigestAndExtendDigest(t *testing.T) {
 	var sha384Hash [48]byte
 	sha384Hash[0] = 0x01
 	client := fakertmr.CreateRtmrSubsystem()
+	defer client.Close()
 	rtmrIndex := 3
 	// GetDigest
 	digest1, err := GetDigest(client, rtmrIndex)

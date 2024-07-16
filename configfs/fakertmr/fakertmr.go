@@ -193,13 +193,19 @@ func (r *RtmrSubsystem) WriteFile(name string, content []byte) error {
 	return r.WriteAttr(path.Join(r.Path, p.Entry), p.Attribute, content, r.rtmrIndexMap)
 }
 
+// Close removes the temporary files in the fake rtmr subsystem.
+func (r *RtmrSubsystem) Close() error {
+	return os.RemoveAll(r.Path)
+}
+
 // CreateRtmrSubsystem creates a new rtmr subsystem.
 // The current subsystem only supports TDX.
 func CreateRtmrSubsystem() *RtmrSubsystem {
 	return &RtmrSubsystem{
-		Random:    rand.Reader,
-		WriteAttr: writeTdx,
-		ReadAttr:  readTdx,
-		Path:      path.Join(os.TempDir(), tsmRtmrSubsystem),
+		Random:       rand.Reader,
+		WriteAttr:    writeTdx,
+		ReadAttr:     readTdx,
+		Path:         path.Join(os.TempDir(), tsmRtmrSubsystem),
+		rtmrIndexMap: make(map[int]bool),
 	}
 }
