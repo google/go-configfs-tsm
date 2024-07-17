@@ -64,68 +64,71 @@ func readTdx(entry string, attr string) ([]byte, error) {
 	return os.ReadFile(path.Join(entry, attr))
 }
 
-func writeTdx(entry string, attr string, content []byte, indexMap map[int]bool) error {
-	switch attr {
-	case tsmRtmrDigest:
-		// Check if the content is a valid SHA384 hash.
-		if len(content) != crypto.SHA384.Size() {
-			return syscall.EINVAL
-		}
-		// Check if the entry is initialized.
-		content, err := os.ReadFile(filepath.Join(entry, tsmPathIndex))
-		if err != nil {
-			return err
-		}
-		rtmrIndex, err := strconv.Atoi(string(content))
-		if err != nil {
-			return err
-		}
-		if rtmrIndex != 2 && rtmrIndex != 3 {
-			return os.ErrPermission
-		}
-		oldDigest, err := os.ReadFile(filepath.Join(entry, tsmRtmrDigest))
-		if err != nil {
-			return err
-		}
-		newDigest := sha512.Sum384(append(oldDigest[:], content...))
-		if err := os.WriteFile(filepath.Join(entry, tsmRtmrDigest), newDigest[:], 0666); err != nil {
-			return err
-		}
-	case tsmPathIndex:
-		rtmrIndex, e := strconv.Atoi(string(content))
-		if e != nil {
-			return fmt.Errorf("WriteTdx: %v", e)
-		}
-		if rtmrIndex < 0 || rtmrIndex > 3 {
-			return fmt.Errorf("WriteTdx: invalid rtmr index %d. Index can only be a non-negative number", rtmrIndex)
-		}
-		if indexMap[rtmrIndex] {
-			return syscall.EBUSY
-		}
-		indexMap[rtmrIndex] = true
-		if err := os.WriteFile(filepath.Join(entry, tsmPathIndex), content, 0666); err != nil {
-			return err
-		}
-		var rtmrPcrMaps = map[int]string{
-			0: "1,7\n",
-			1: "2-6\n",
-			2: "8-15\n",
-			3: "\n",
-		}
-		tempTsmPathTcgMap := filepath.Join(os.TempDir(), tsmRtmrSubsystem, tsmPathTcgMap)
-		if err := os.WriteFile(tempTsmPathTcgMap, []byte(rtmrPcrMaps[rtmrIndex]), 0400); err != nil {
-			return err
-		}
-		if err := os.Rename(tempTsmPathTcgMap, filepath.Join(entry, tsmPathTcgMap)); err != nil {
-			return err
-		}
+func makeWriteTdx(root string) func(entry string, attr string, content []byte, indexMap map[int]bool) error {
+	return func(entry string, attr string, content []byte, indexMap map[int]bool) error {
+		switch attr {
+		case tsmRtmrDigest:
+			// Check if the content is a valid SHA384 hash.
+			if len(content) != crypto.SHA384.Size() {
+				return syscall.EINVAL
+			}
+			// Check if the entry is initialized.
+			content, err := os.ReadFile(filepath.Join(entry, tsmPathIndex))
+			if err != nil {
+				return err
+			}
+			rtmrIndex, err := strconv.Atoi(string(content))
+			if err != nil {
+				return err
+			}
+			if rtmrIndex != 2 && rtmrIndex != 3 {
+				return os.ErrPermission
+			}
+			oldDigest, err := os.ReadFile(filepath.Join(entry, tsmRtmrDigest))
+			if err != nil {
+				return err
+			}
+			newDigest := sha512.Sum384(append(oldDigest[:], content...))
+			if err := os.WriteFile(filepath.Join(entry, tsmRtmrDigest), newDigest[:], 0666); err != nil {
+				return err
+			}
+		case tsmPathIndex:
+			rtmrIndex, e := strconv.Atoi(string(content))
+			if e != nil {
+				return fmt.Errorf("WriteTdx: %v", e)
+			}
+			if rtmrIndex < 0 || rtmrIndex > 3 {
+				return fmt.Errorf("WriteTdx: invalid rtmr index %d. Index can only be a non-negative number", rtmrIndex)
+			}
+			if indexMap[rtmrIndex] {
+				return syscall.EBUSY
+			}
+			indexMap[rtmrIndex] = true
+			if err := os.WriteFile(filepath.Join(entry, tsmPathIndex), content, 0666); err != nil {
+				return err
+			}
+			var rtmrPcrMaps = map[int]string{
+				0: "1,7\n",
+				1: "2-6\n",
+				2: "8-15\n",
+				3: "\n",
+			}
+			// Write the tcgmap into a temp file and rename it to keep the read-only permission.
+			tempTsmPathTcgMap := filepath.Join(root, tsmPathTcgMap)
+			if err := os.WriteFile(tempTsmPathTcgMap, []byte(rtmrPcrMaps[rtmrIndex]), 0400); err != nil {
+				return err
+			}
+			if err := os.Rename(tempTsmPathTcgMap, filepath.Join(entry, tsmPathTcgMap)); err != nil {
+				return err
+			}
 
-	case tsmPathTcgMap:
-		return os.ErrPermission
-	default:
-		return fmt.Errorf("WriteTdx: unknown attribute %q", attr)
+		case tsmPathTcgMap:
+			return os.ErrPermission
+		default:
+			return fmt.Errorf("WriteTdx: unknown attribute %q", attr)
+		}
+		return nil
 	}
-	return nil
 }
 
 // ReadDir reads the directory named by dirname
@@ -195,11 +198,12 @@ func (r *RtmrSubsystem) WriteFile(name string, content []byte) error {
 
 // CreateRtmrSubsystem creates a new rtmr subsystem.
 // The current subsystem only supports TDX.
-func CreateRtmrSubsystem() *RtmrSubsystem {
+func CreateRtmrSubsystem(tempDir string) *RtmrSubsystem {
 	return &RtmrSubsystem{
-		Random:    rand.Reader,
-		WriteAttr: writeTdx,
-		ReadAttr:  readTdx,
-		Path:      path.Join(os.TempDir(), tsmRtmrSubsystem),
+		Random:       rand.Reader,
+		WriteAttr:    makeWriteTdx(tempDir),
+		ReadAttr:     readTdx,
+		Path:         path.Join(tempDir, tsmRtmrSubsystem),
+		rtmrIndexMap: make(map[int]bool),
 	}
 }
