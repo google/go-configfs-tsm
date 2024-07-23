@@ -103,7 +103,7 @@ func readUint64File(client configfsi.Client, p string) (uint64, error) {
 func CreateOpenReport(client configfsi.Client) (*OpenReport, error) {
 	entry, err := client.MkdirTemp(subsystemPath, "entry")
 	if err != nil {
-		return nil, fmt.Errorf("could not create report entry in configfs: %v", err)
+		return nil, fmt.Errorf("failed to open confidential computing reporting interface: %v", err)
 	}
 	return UnsafeWrap(client, entry)
 }
