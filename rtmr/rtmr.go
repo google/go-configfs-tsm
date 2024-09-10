@@ -45,8 +45,8 @@ type Extend struct {
 // Response is a struct that represents the response of reading a rtmr entry in the configfs.
 type Response struct {
 	RtmrIndex int
-	digest    []byte
-	tcgMap    []byte
+	Digest    []byte
+	TcgMap    []byte
 }
 
 func (r *Extend) attribute(subtree string) string {
@@ -192,7 +192,7 @@ func GetDigest(client configfsi.Client, rtmr int) (*Response, error) {
 
 	return &Response{
 		RtmrIndex: rtmr,
-		digest:    digest,
-		tcgMap:    tcgmap,
+		Digest:    digest,
+		TcgMap:    tcgmap,
 	}, nil
 }
