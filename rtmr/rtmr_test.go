@@ -103,8 +103,8 @@ func TestGetDigestOk(t *testing.T) {
 		if r.RtmrIndex != tc.rtmr {
 			t.Fatalf("GetDigestRtmr(%d) failed: got %d, want %d", tc.rtmr, r.RtmrIndex, tc.rtmr)
 		}
-		if !bytes.Equal(r.tcgMap, tc.tcgMap) {
-			t.Fatalf("GetDigestRtmr(%d) failed: got %q, want %q", tc.rtmr, r.tcgMap, tc.tcgMap)
+		if !bytes.Equal(r.TcgMap, tc.tcgMap) {
+			t.Fatalf("GetDigestRtmr(%d) failed: got %q, want %q", tc.rtmr, r.TcgMap, tc.tcgMap)
 		}
 	}
 }
@@ -129,7 +129,7 @@ func TestGetRtmrDigestAndExtendDigest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetDigest(%d) failed: %v", rtmrIndex, err)
 	}
-	if bytes.Equal(digest1.digest, digest2.digest) {
-		t.Fatalf("rtmr%q does not change after an extend %q", rtmrIndex, digest2.digest)
+	if bytes.Equal(digest1.Digest, digest2.Digest) {
+		t.Fatalf("rtmr%q does not change after an extend %q", rtmrIndex, digest2.Digest)
 	}
 }
