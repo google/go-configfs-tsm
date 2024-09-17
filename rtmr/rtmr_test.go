@@ -114,10 +114,15 @@ func TestGetRtmrDigestAndExtendDigest(t *testing.T) {
 	sha384Hash[0] = 0x01
 	client := fakertmr.CreateRtmrSubsystem(t.TempDir())
 	rtmrIndex := 3
+	initRtmrValue := []byte("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
+	extendRtmrValue := []byte("ܮ\x87\xd5n\xa6\x12\x15\xf3#\xa6&0`\xb6\x96(\x02\xb2Po\x80\xbe*\x92\xcb\fJ\x1f\x06\x80\xf0\x9c\x14\xee\xaan\x82\xc9\xfa\x9a\xec\xf9ROeś")
 	// GetDigest
 	digest1, err := GetDigest(client, rtmrIndex)
 	if err != nil {
 		t.Fatalf("GetDigest(%d) failed: %v", rtmrIndex, err)
+	}
+	if !bytes.Equal(digest1.Digest, initRtmrValue) {
+		t.Fatalf("rtmr%q does not have the all-zero initial value %q", rtmrIndex, digest1.Digest)
 	}
 	// ExtendDigest
 	err = ExtendDigest(client, rtmrIndex, sha384Hash[:])
@@ -129,7 +134,7 @@ func TestGetRtmrDigestAndExtendDigest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetDigest(%d) failed: %v", rtmrIndex, err)
 	}
-	if bytes.Equal(digest1.Digest, digest2.Digest) {
-		t.Fatalf("rtmr%q does not change after an extend %q", rtmrIndex, digest2.Digest)
+	if !bytes.Equal(digest2.Digest, extendRtmrValue) {
+		t.Fatalf("rtmr%q does not match the expected value: got %q, want %q", rtmrIndex, digest2.Digest, extendRtmrValue)
 	}
 }

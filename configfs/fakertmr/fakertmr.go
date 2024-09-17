@@ -73,11 +73,11 @@ func makeWriteTdx(root string) func(entry string, attr string, content []byte, i
 				return syscall.EINVAL
 			}
 			// Check if the entry is initialized.
-			content, err := os.ReadFile(filepath.Join(entry, tsmPathIndex))
+			indexFile, err := os.ReadFile(filepath.Join(entry, tsmPathIndex))
 			if err != nil {
 				return err
 			}
-			rtmrIndex, err := strconv.Atoi(string(content))
+			rtmrIndex, err := strconv.Atoi(string(indexFile))
 			if err != nil {
 				return err
 			}
@@ -119,6 +119,13 @@ func makeWriteTdx(root string) func(entry string, attr string, content []byte, i
 				return err
 			}
 			if err := os.Rename(tempTsmPathTcgMap, filepath.Join(entry, tsmPathTcgMap)); err != nil {
+				return err
+			}
+			// Initialize the digest file to all zeros.
+			// SHA-384 produces a 48-byte hash.
+			const sha384Size = 48
+			digest := [sha384Size]byte{}
+			if err := os.WriteFile(filepath.Join(entry, tsmRtmrDigest), digest[:], 0666); err != nil {
 				return err
 			}
 
