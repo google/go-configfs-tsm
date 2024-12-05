@@ -28,6 +28,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/go-configfs-tsm/configfs/configfsi"
+	"github.com/google/uuid"
 )
 
 var ErrPrivLevelFormat = errors.New("privlevel must be 0-3")
@@ -311,6 +312,49 @@ func checkV7(privlevelFloor uint) func(*ReportEntry, string, []byte) error {
 	}
 }
 
+func read611(privlevelFloor uint) func(*ReportEntry, string) ([]byte, error) {
+	fallback := readV7(privlevelFloor)
+
+	return func(e *ReportEntry, attr string) ([]byte, error) {
+		switch attr {
+		case "manifestblob":
+			return []byte("fakemanifest\n"), nil
+		default:
+			return fallback(e, attr)
+		}
+
+	}
+}
+
+func check611(privlevelFloor uint) func(*ReportEntry, string, []byte) error {
+	fallback := checkV7(privlevelFloor)
+	return func(e *ReportEntry, attr string, contents []byte) error {
+		switch attr {
+		case "service_provider":
+			return nil
+		case "service_guid":
+			_, err := uuid.Parse(string(contents))
+			return err
+		case "service_manifest_version":
+			if !utf8.Valid(contents) {
+				return ErrPrivLevelFormat
+			}
+			_, err := configfsi.Kstrtouint(contents, renderBase, 32)
+			return err
+		default:
+			return fallback(e, attr, contents)
+		}
+	}
+}
+
+func make611() *ReportEntry {
+	res := makeV7()
+	res.InAttrs["service_provider"] = &ReportAttributeState{}
+	res.InAttrs["service_guid"] = &ReportAttributeState{}
+	res.InAttrs["service_manifest_version"] = &ReportAttributeState{}
+	return res
+}
+
 // ReportV7 returns an empty report subsystem with attributes as specified in the configfs-tsm
 // Patch v7 series.
 func ReportV7(privlevelFloor uint) *ReportSubsystem {
@@ -318,6 +362,17 @@ func ReportV7(privlevelFloor uint) *ReportSubsystem {
 		MakeEntry:   makeV7,
 		ReadAttr:    readV7(privlevelFloor),
 		CheckInAttr: checkV7(privlevelFloor),
+		Random:      rand.Reader,
+	}
+}
+
+// Report611 returns an empty report subsystem with attributes as specified in configfs-tsm
+// as of Linux 6.11.
+func Report611(privlevelFloor uint) *ReportSubsystem {
+	return &ReportSubsystem{
+		MakeEntry:   make611,
+		ReadAttr:    read611(privlevelFloor),
+		CheckInAttr: check611(privlevelFloor),
 		Random:      rand.Reader,
 	}
 }
