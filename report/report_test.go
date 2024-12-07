@@ -82,10 +82,19 @@ func TestGetErr(t *testing.T) {
 			floor:   1,
 			wantErr: "privlevel 0 cannot be less than 1",
 		},
+		{
+			name: "non-guid",
+			req: &Request{
+				InBlob:      make([]byte, 64),
+				ServiceGuid: "00000000-0000-0000-0000-00000000000g",
+			},
+			wantErr: "invalid UUID format",
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			c := &faketsm.Client{Subsystems: map[string]configfsi.Client{"report": faketsm.ReportV7(tc.floor)}}
+			c := &faketsm.Client{
+				Subsystems: map[string]configfsi.Client{"report": faketsm.Report611(tc.floor)}}
 			resp, err := Get(c, tc.req)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Fatalf("Get(%+v) = %+v, %v, want %q", tc.req, resp, err, tc.wantErr)
