@@ -44,6 +44,7 @@ type Request struct {
 	ServiceProvider        string
 	ServiceGuid            string
 	ServiceManifestVersion string
+	ManifestSelector       []byte
 }
 
 // OpenReport represents a created tsm report subtree with internal expectations for the generation.
@@ -54,6 +55,7 @@ type OpenReport struct {
 	ServiceProvider        string
 	ServiceGuid            string
 	ServiceManifestVersion string
+	ManifestSelector       []byte
 	entry                  *configfsi.TsmPath
 	expectedGeneration     uint64
 	client                 configfsi.Client
@@ -143,6 +145,7 @@ func Create(client configfsi.Client, req *Request) (*OpenReport, error) {
 	r.ServiceProvider = req.ServiceProvider
 	r.ServiceGuid = req.ServiceGuid
 	r.ServiceManifestVersion = req.ServiceManifestVersion
+	r.ManifestSelector = req.ManifestSelector
 	return r, nil
 }
 
@@ -223,6 +226,11 @@ func (r *OpenReport) Get() (*Response, error) {
 	}
 	if r.ServiceManifestVersion != "" {
 		if err := r.WriteOption("service_manifest_version", []byte(r.ServiceManifestVersion)); err != nil {
+			return nil, err
+		}
+	}
+	if len(r.ManifestSelector) > 0 {
+		if err := r.WriteOption("manifest_selector", r.ManifestSelector); err != nil {
 			return nil, err
 		}
 	}
